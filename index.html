@@ -83,7 +83,7 @@
       <div class="room-id-text" id="room_id_display">生成中...</div>
     </div>
     <p style="font-size: 12px; color: #AAA; margin: 0; text-align: center;">請用手機掃描 QR Code 開啟相機</p>
-    <p style="font-size: 12px; color: #00FFCC; margin: 0; text-align: center;">💡 提示：請使用綠色圓貼紙進行對位測試</p>
+    <p style="font-size: 12px; color: #00FFCC; margin: 0; text-align: center;">💡 提示：請使用鶴屋藍色圓貼紙進行對位測試</p>
 
     <hr style="border: 0.5px solid #333; width: 100%;">
 
@@ -220,8 +220,8 @@
       return smoothedLandmarks;
     }
 
-    // 🎯 貼紙顏色檢測演算法 (HSV 綠色貼紙識別)
-    function isGreenStickerColor(r, g, b) {
+    // 🎯 貼紙顏色檢測演算法 (HSV 鶴屋藍色標籤識別: Hue 190°~250°)
+    function isBlueStickerColor(r, g, b) {
       const max = Math.max(r, g, b), min = Math.min(r, g, b);
       const d = max - min;
       if (max === 0 || d === 0) return false;
@@ -233,26 +233,32 @@
       else if (max === b) h = (r - g) / d + 4;
       h = (h / 6) * 360;
 
-      // 當像素 Hue 落在 75°~165°（綠色系）且具備一定飽和度與亮度時判定為貼紙
-      return (h >= 75 && h <= 165 && s >= 0.35 && v >= 0.25);
+      // 當像素 Hue 落在 190°~250°（正藍色系）且具備高飽和度與亮度時判定為貼紙
+      return (h >= 190 && h <= 250 && s >= 0.35 && v >= 0.25);
     }
 
     function checkStickerDetected(pt, radius = 9) {
       const dpr = window.devicePixelRatio || 1;
+      const cw = canvasElement.width;
       const r = Math.round(radius * dpr);
+
+      // 修正鏡像座標：getImageData 擷取未翻轉畫布像素，X 座標需翻轉對齊 (cw - pt.x)
+      const realCanvasX = cw - pt.x;
+      const realCanvasY = pt.y;
+
       try {
-        const imgData = canvasCtx.getImageData(pt.x - r, pt.y - r, r * 2, r * 2);
+        const imgData = canvasCtx.getImageData(realCanvasX - r, realCanvasY - r, r * 2, r * 2);
         const data = imgData.data;
         let matchCount = 0;
         const totalPixels = data.length / 4;
 
         for (let i = 0; i < data.length; i += 4) {
-          if (isGreenStickerColor(data[i], data[i+1], data[i+2])) {
+          if (isBlueStickerColor(data[i], data[i+1], data[i+2])) {
             matchCount++;
           }
         }
-        // ROI 區域內超過 20% 像素符合貼紙色即判定為成功黏貼
-        return (matchCount / totalPixels) > 0.20;
+        // ROI 區域內超過 18% 像素符合藍色即判定為成功黏貼
+        return (matchCount / totalPixels) > 0.18;
       } catch (e) {
         return false;
       }
@@ -336,7 +342,7 @@
           y: Math.round(anchor.y + (hCun * uH.y + vCun * uV.y) * cunInPixels)
         });
 
-        // 穴位座標計算（🚫 已完全移除睛明穴）
+        // 穴位座標計算（已排除睛明穴）
         const yintang = {
           x: Math.round((getPt(55).x + getPt(285).x) / 2),
           y: Math.round((getPt(55).y + getPt(285).y) / 2)
@@ -357,7 +363,7 @@
 
         // 🎨 穴位繪製與紅/藍轉換判定
         const drawPoint = (label, pt) => {
-          // 採樣底圖，判斷是否已貼上貼紙
+          // 採樣底圖，判斷是否已貼上藍色貼紙
           const isAttached = checkStickerDetected(pt);
 
           // 未黏貼：紅色；已黏貼：藍色
@@ -391,7 +397,7 @@
             const textWidth = canvasCtx.measureText(textLabel).width;
             const paddingX = 8 * dpr, paddingY = 5 * dpr, offsetY = 14 * dpr;
 
-            // 標籤底色（已貼貼紙用深藍底，未貼用黑色底）
+            // 標籤底色（已貼藍色貼紙用深藍底，未貼用黑色底）
             canvasCtx.fillStyle = isAttached ? 'rgba(0, 40, 90, 0.85)' : 'rgba(0, 0, 0, 0.75)';
             canvasCtx.beginPath();
             canvasCtx.roundRect(-textWidth / 2 - paddingX, -fontSize - offsetY - (paddingY / 2), textWidth + (paddingX * 2), fontSize + paddingY, 5 * dpr);
